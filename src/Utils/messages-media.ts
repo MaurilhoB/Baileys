@@ -51,13 +51,20 @@ const extractVideoThumb = async (
         })
     }) as Promise<void>
 
-export const compressImage = async (bufferOrFilePath: Buffer | string) => {
+export const compressImage = async (bufferOrFilePath: Readable | Buffer | string) => {
+    if(bufferOrFilePath instanceof Readable) {
+        bufferOrFilePath = await toBuffer(bufferOrFilePath)
+    }
     const { read, MIME_JPEG } = await import('jimp')
     const jimp = await read(bufferOrFilePath as any)
     const result = await jimp.resize(32, 32).getBufferAsync(MIME_JPEG)
     return result
 }
-export const generateProfilePicture = async (bufferOrFilePath: Buffer | string) => {
+export const generateProfilePicture = async (bufferOrFilePath: Readable | Buffer | string) => {
+    if(bufferOrFilePath instanceof Readable) {
+        bufferOrFilePath = await toBuffer(bufferOrFilePath)
+    }
+    
     const { read, MIME_JPEG } = await import('jimp')
     const jimp = await read(bufferOrFilePath as any)
     const min = Math.min(jimp.getWidth (), jimp.getHeight ())
@@ -89,7 +96,16 @@ export const toReadable = (buffer: Buffer) => {
     readable.push(null)
     return readable
 }
+export const toBuffer = (stream: Readable): Promise<Buffer> => {
+    return new Promise((resolve, reject) => {
+        let buffs = []
+        stream.on('data', chunk => buffs.push(chunk))
+        stream.on('end', () => resolve(Buffer.concat(buffs)))
+        stream.on('error', (err) => reject(err))
+    })
+}
 export const getStream = async (item: WAMediaUpload) => {
+    if(item instanceof Readable) return {stream: item, type: 'readable'}
     if(Buffer.isBuffer(item)) return { stream: toReadable(item), type: 'buffer' }
     if(item.url.toString().startsWith('http://') || item.url.toString().startsWith('https://')) {
         return { stream: await getGotStream(item.url), type: 'remote' }
