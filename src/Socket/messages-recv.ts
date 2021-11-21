@@ -281,8 +281,12 @@ export const makeMessagesRecvSocket = (config: SocketConfig) => {
             switch(child?.tag) {
                 case 'create':
                     const metadata = extractGroupMetadata(child)
+
                     result.messageStubType = WAMessageStubType.GROUP_CREATE
                     result.messageStubParameters = [metadata.subject]
+                    result.key = {
+                        participant: jidNormalizedUser(metadata.owner)
+                    }
 
                     ev.emit('chats.upsert', [{
                         id: metadata.id,
@@ -307,7 +311,18 @@ export const makeMessagesRecvSocket = (config: SocketConfig) => {
                 case 'leave':
                     const stubType = `GROUP_PARTICIPANT_${child.tag!.toUpperCase()}`
                     result.messageStubType = WAMessageStubType[stubType]
-                    result.messageStubParameters = getBinaryNodeChildren(child, 'participant').map(p => p.attrs.jid)
+
+                    const participants = getBinaryNodeChildren(child, 'participant').map(p => p.attrs.jid)
+                    if(
+                        participants.length === 1 && 
+                        // if recv. "remove" message and sender removed themselves
+                        // mark as left
+                        areJidsSameUser(participants[0], node.attrs.participant) &&
+                        child.tag === 'remove'
+                    ) {
+                        result.messageStubType = WAMessageStubType.GROUP_PARTICIPANT_LEAVE
+                    }
+                    result.messageStubParameters = participants
                     break
                 case 'subject':
                     result.messageStubType = WAMessageStubType.GROUP_CHANGE_SUBJECT
@@ -421,13 +436,17 @@ export const makeMessagesRecvSocket = (config: SocketConfig) => {
             })
         }
 
-        ev.emit(
-            'messages.upsert', 
-            { 
-                messages: fullMessages.map(m => proto.WebMessageInfo.fromObject(m)), 
-                type: stanza.attrs.offline ? 'append' : 'notify' 
-            }
-        )
+        if(fullMessages.length) {
+            ev.emit(
+                'messages.upsert', 
+                { 
+                    messages: fullMessages.map(m => proto.WebMessageInfo.fromObject(m)), 
+                    type: stanza.attrs.offline ? 'append' : 'notify' 
+                }
+            )
+        } else {
+            logger.warn({ stanza }, `received node with 0 messages`)
+        }
     })
 
     ws.on('CB:ack,class:message', async(node: BinaryNode) => {
@@ -488,7 +507,8 @@ export const makeMessagesRecvSocket = (config: SocketConfig) => {
                 remoteJid: node.attrs.from,
                 fromMe,
                 participant: node.attrs.participant,
-                id: node.attrs.id
+                id: node.attrs.id,
+                ...(msg.key || {})
             }
             msg.messageTimestamp = +node.attrs.t
             
