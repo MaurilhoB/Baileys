@@ -19,7 +19,7 @@ export type WALocationMessage = proto.ILocationMessage
 export type WAGenericMediaMessage = proto.IVideoMessage | proto.IImageMessage | proto.IAudioMessage | proto.IDocumentMessage | proto.IStickerMessage
 export import WAMessageStubType = proto.WebMessageInfo.WebMessageInfoStubType
 export import WAMessageStatus = proto.WebMessageInfo.WebMessageInfoStatus
-export type WAMediaUpload = Readable | Buffer | { url: URL | string }
+export type WAMediaUpload = Buffer | { url: URL | string } | { stream: Readable }
 /** Set of message types that are supported by the library */
 export type MessageType = keyof proto.Message
 

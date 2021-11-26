@@ -60,9 +60,14 @@ export const compressImage = async (bufferOrFilePath: Readable | Buffer | string
     const result = await jimp.resize(32, 32).getBufferAsync(MIME_JPEG)
     return result
 }
-export const generateProfilePicture = async (bufferOrFilePath: Readable | Buffer | string) => {
-    if(bufferOrFilePath instanceof Readable) {
-        bufferOrFilePath = await toBuffer(bufferOrFilePath)
+export const generateProfilePicture = async (mediaUpload: WAMediaUpload) => {
+    let bufferOrFilePath: Buffer | string
+    if(Buffer.isBuffer(mediaUpload)) {
+        bufferOrFilePath = mediaUpload
+    } else if('url' in mediaUpload) {
+        bufferOrFilePath = mediaUpload.url.toString()
+    } else {
+        bufferOrFilePath = await toBuffer(mediaUpload.stream)
     }
     
     const { read, MIME_JPEG } = await import('jimp')
@@ -104,8 +109,8 @@ export const toBuffer = async(stream: Readable) => {
     return buff
 }
 export const getStream = async (item: WAMediaUpload) => {
-    if(item instanceof Readable) return {stream: item, type: 'readable'}
     if(Buffer.isBuffer(item)) return { stream: toReadable(item), type: 'buffer' }
+    if('stream' in item) return { stream: item.stream, type: 'readable' }
     if(item.url.toString().startsWith('http://') || item.url.toString().startsWith('https://')) {
         return { stream: await getGotStream(item.url), type: 'remote' }
     }
