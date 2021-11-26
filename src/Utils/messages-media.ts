@@ -96,13 +96,12 @@ export const toReadable = (buffer: Buffer) => {
     readable.push(null)
     return readable
 }
-export const toBuffer = (stream: Readable): Promise<Buffer> => {
-    return new Promise((resolve, reject) => {
-        let buffs = []
-        stream.on('data', chunk => buffs.push(chunk))
-        stream.on('end', () => resolve(Buffer.concat(buffs)))
-        stream.on('error', (err) => reject(err))
-    })
+export const toBuffer = async(stream: Readable) => {
+    let buff = Buffer.alloc(0)
+    for await(const chunk of stream) {
+        buff = Buffer.concat([ buff, chunk ])
+    }
+    return buff
 }
 export const getStream = async (item: WAMediaUpload) => {
     if(item instanceof Readable) return {stream: item, type: 'readable'}
